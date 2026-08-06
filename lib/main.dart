@@ -5,7 +5,7 @@ import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'features/authentication/presentation/pages/login_page.dart';
 import 'features/authentication/presentation/providers/auth_providers.dart';
-import 'features/transaction/presentation/pages/transaction_list_page.dart';
+import 'shared/widgets/app_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,9 +40,7 @@ class _AuthGate extends ConsumerWidget {
     return authState.when(
       data: (user) {
         if (user == null) return const LoginPage();
-        // Placeholder sampai Dashboard dibuat — untuk sekarang langsung
-        // arahkan ke Transaction List supaya fitur CRUD bisa dites.
-        return const TransactionListPage();
+        return const AppShell();
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),

@@ -18,6 +18,14 @@ class TransactionRepositoryImpl implements TransactionRepository {
   }
 
   @override
+  Stream<List<TransactionEntity>> watchAllTransactions({
+    required String userId,
+    int limit = 500,
+  }) {
+    return _remote.watchAllTransactions(userId: userId, limit: limit);
+  }
+
+  @override
   Future<Result<void>> addTransaction(TransactionEntity transaction) async {
     try {
       await _remote.addTransaction(TransactionModel.fromEntity(transaction));

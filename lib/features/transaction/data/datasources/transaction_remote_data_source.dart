@@ -30,6 +30,22 @@ class TransactionRemoteDataSource {
             .toList());
   }
 
+  /// Semua transaksi lintas bulan, terbaru dulu, dibatasi [limit] —
+  /// dipakai untuk hitung Total Saldo & Transaksi Terakhir di Dashboard.
+  Stream<List<TransactionModel>> watchAllTransactions({
+    required String userId,
+    int limit = 500,
+  }) {
+    return _col
+        .where('userId', isEqualTo: userId)
+        .orderBy('date', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => TransactionModel.fromJson(d.data(), d.id))
+            .toList());
+  }
+
   Future<void> addTransaction(TransactionModel transaction) {
     return _col.add(transaction.toJson());
   }

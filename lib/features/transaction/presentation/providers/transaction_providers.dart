@@ -8,6 +8,7 @@ import '../../domain/repositories/transaction_repository.dart';
 import '../../domain/usecases/add_transaction_usecase.dart';
 import '../../domain/usecases/delete_transaction_usecase.dart';
 import '../../domain/usecases/update_transaction_usecase.dart';
+import '../../domain/usecases/watch_all_transactions_usecase.dart';
 import '../../domain/usecases/watch_transactions_usecase.dart';
 
 // --- Dependency injection ---
@@ -24,6 +25,8 @@ final transactionRepositoryProvider = Provider<TransactionRepository>((ref) {
 
 final watchTransactionsUseCaseProvider = Provider((ref) =>
     WatchTransactionsUseCase(ref.watch(transactionRepositoryProvider)));
+final watchAllTransactionsUseCaseProvider = Provider((ref) =>
+    WatchAllTransactionsUseCase(ref.watch(transactionRepositoryProvider)));
 final addTransactionUseCaseProvider = Provider(
     (ref) => AddTransactionUseCase(ref.watch(transactionRepositoryProvider)));
 final updateTransactionUseCaseProvider = Provider((ref) =>
@@ -63,6 +66,15 @@ final transactionsStreamProvider =
   return ref
       .watch(watchTransactionsUseCaseProvider)
       .call(userId: userId, month: month);
+});
+
+/// Semua transaksi lintas bulan (terbatas [limit] demi performa) — dasar
+/// Total Saldo & Transaksi Terakhir di Dashboard.
+final allTransactionsStreamProvider =
+    StreamProvider<List<TransactionEntity>>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return const Stream.empty();
+  return ref.watch(watchAllTransactionsUseCaseProvider).call(userId: userId);
 });
 
 /// Ringkasan total income/expense bulan aktif — dipakai lagi di fase Dashboard.

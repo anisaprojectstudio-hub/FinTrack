@@ -9,6 +9,14 @@ abstract class TransactionRepository {
     required DateTime month,
   });
 
+  /// Semua transaksi milik [userId] lintas bulan, terbaru dulu — dasar
+  /// perhitungan "Total Saldo" & "Transaksi Terakhir" di Dashboard.
+  /// Dibatasi [limit] untuk menjaga performa (lihat NFR Tahap 1).
+  Stream<List<TransactionEntity>> watchAllTransactions({
+    required String userId,
+    int limit = 500,
+  });
+
   Future<Result<void>> addTransaction(TransactionEntity transaction);
 
   Future<Result<void>> updateTransaction(TransactionEntity transaction);
