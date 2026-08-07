@@ -4,6 +4,7 @@ import '../../../authentication/presentation/providers/auth_providers.dart';
 import '../../../transaction/presentation/pages/add_transaction_page.dart';
 import '../../../transaction/presentation/pages/transaction_list_page.dart';
 import '../../../transaction/presentation/providers/transaction_providers.dart';
+import '../../../report/presentation/pages/report_page.dart';
 import '../providers/dashboard_providers.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/expense_donut_chart.dart';
@@ -25,6 +26,15 @@ class DashboardPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(
             'Halo, ${(user?.name.isNotEmpty ?? false) ? user!.name : 'FinTrack'} 👋'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart_outlined),
+            tooltip: 'Laporan',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ReportPage()),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.of(context).push(
