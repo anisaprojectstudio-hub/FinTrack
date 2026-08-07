@@ -1,62 +1,50 @@
-# FinTrack — Fase Transaction CRUD
+# FinTrack — Fase Financial Report
 
-> Lanjutan dari fase Authentication. Ini fitur inti aplikasi: tambah, lihat, ubah, hapus transaksi — mengikuti skema `transactions` (Tahap 3) dan desain Transaction List & Add Transaction (Tahap 4).
+> Lanjutan dari fase Budget System. Halaman Report memberi gambaran pola keuangan mingguan/bulanan — mengikuti Tahap 1 (laporan mingguan/bulanan, kategori terbesar) dan desain Tahap 4.
 
 ---
 
 ## 1. File yang Dibuat
 
 ```
-lib/
-├── core/
-│   ├── constants/categories.dart          # kategori default + ikon
-│   └── utils/
-│       ├── currency_formatter.dart        # format Rupiah
-│       └── date_label_formatter.dart      # label "Hari Ini"/"Kemarin"
-│
-└── features/transaction/
-    ├── domain/
-    │   ├── entities/transaction_entity.dart   # + enum TransactionType
-    │   ├── repositories/transaction_repository.dart
-    │   └── usecases/
-    │       ├── watch_transactions_usecase.dart
-    │       ├── add_transaction_usecase.dart      # validasi nominal > 0
-    │       ├── update_transaction_usecase.dart
-    │       └── delete_transaction_usecase.dart
-    ├── data/
-    │   ├── models/transaction_model.dart
-    │   ├── datasources/transaction_remote_data_source.dart
-    │   └── repositories/transaction_repository_impl.dart
-    └── presentation/
-        ├── providers/transaction_providers.dart
-        ├── widgets/
-        │   ├── transaction_list_tile.dart
-        │   ├── category_grid_picker.dart
-        │   └── type_segmented_control.dart
-        └── pages/
-            ├── transaction_list_page.dart
-            └── add_transaction_page.dart      # dipakai untuk Tambah & Ubah
+lib/features/report/
+├── domain/
+│   ├── entities/
+│   │   ├── report_period.dart          # enum weekly/monthly
+│   │   └── report_summary.dart         # ReportSummary, CategoryBreakdownItem, TrendPoint
+│   └── usecases/calculate_report_summary_usecase.dart   # fungsi murni
+└── presentation/
+    ├── providers/report_providers.dart
+    ├── widgets/
+    │   ├── period_toggle.dart
+    │   ├── report_summary_row.dart
+    │   ├── report_trend_chart.dart          # pakai fl_chart BarChart
+    │   ├── top_category_highlight.dart
+    │   └── category_breakdown_list.dart     # tappable, drill-down
+    └── pages/report_page.dart
 ```
 
-`main.dart` juga diperbarui — setelah login, langsung diarahkan ke `TransactionListPage` supaya fitur ini bisa langsung dites (Dashboard sungguhan menyusul di fase berikutnya).
+Dua file yang sudah ada juga **diperbarui**:
+- `transaction_list_page.dart` — sekarang menerima `initialCategory` opsional + chip filter kategori yang bisa dihapus, mendukung drill-down dari Report.
+- `dashboard_page.dart` — ada ikon grafik di AppBar yang membuka Report (sesuai keputusan navigasi Tahap 4: Report diakses dari Dashboard, bukan dari bottom nav).
 
 ---
 
 ## 2. Cara Pasang
 
-1. Salin file-file di atas ke project kamu, ikuti struktur folder yang sama.
-2. Timpa `lib/main.dart` yang lama dengan versi terbaru (sudah diarahkan ke Transaction List).
-3. `flutter pub get` lalu `flutter run`.
+1. Salin folder `lib/features/report/` ke project kamu.
+2. Timpa `transaction_list_page.dart` dan `dashboard_page.dart` dengan versi terbaru.
+3. `flutter pub get` (tidak ada dependency baru — `fl_chart` sudah ada), lalu `flutter run`.
 
 ---
 
 ## 3. Poin Desain Penting
 
-- **Nominal divalidasi di use case** (`amount > 0`), bukan cuma di UI — supaya aturan bisnis ini tetap berlaku walau nanti ada cara lain untuk menambah transaksi (misal import CSV di masa depan).
-- **Query bulan aktif** (`transactionsStreamProvider`) otomatis real-time — begitu ada transaksi baru masuk ke Firestore, list & filter langsung update tanpa refresh manual, sesuai pola Stream yang dirancang di Tahap 2.
-- **`monthSummaryProvider`** sudah dibuat sekarang (total income/expense bulan aktif, dihitung dari data yang sama) — ini nanti tinggal dipakai ulang di `BalanceCard`/`SummaryCard` pada fase Dashboard, tidak perlu query baru.
-- **Hapus transaksi**: konfirmasi dialog dulu sebelum benar-benar dihapus dari Firestore, lalu snackbar dengan tombol **Undo** yang menulis ulang dokumen dengan ID yang sama (`restoreTransaction`) — sesuai pertimbangan UX di Tahap 4.
-- **Form Tambah & Ubah pakai satu halaman yang sama** (`AddTransactionPage`) — `existing == null` berarti mode tambah, terisi berarti mode edit. Ini mengurangi duplikasi kode sesuai aturan coding di brief awal kamu.
+- **Report tidak punya data layer sendiri** — persis pola Dashboard: `reportSummaryProvider` reuse `allTransactionsStreamProvider` yang sudah ada, lalu diproses lewat `CalculateReportSummaryUseCase` (fungsi murni, tidak sentuh Firebase).
+- **Grafik tren sengaja dibuat ringkas**: mingguan → 7 batang harian (Sen–Min), bulanan → maksimal 5 batang per minggu-ke (bukan 31 batang harian) — konsisten dengan prinsip UX Tahap 4 "satu insight jelas lebih baik dari grafik padat data".
+- **Minggu berjalan pakai konvensi Senin–Minggu**, dihitung dari tanggal hari ini — bukan tanggal yang sedang difilter di Transaction List/Budget (Report selalu tentang periode "sekarang", sesuai brief awal yang tidak menyebutkan navigasi mundur untuk laporan).
+- **Drill-down kategori** — tap kategori di breakdown list membuka Transaction List dengan filter kategori otomatis aktif (bisa dihapus lewat chip). Catatan kecil: kalau kamu drill-down dari laporan **mingguan** yang kebetulan menyentuh bulan berbeda dari bulan yang sedang aktif di Transaction List, hasil yang tampil tetap mengikuti bulan aktif itu — ini simplifikasi wajar untuk MVP, bisa disempurnakan nanti kalau perlu.
+- **Sama seperti Dashboard**, data dibatasi hingga 500 transaksi terbaru (limit dari `allTransactionsStreamProvider`) — lebih dari cukup untuk laporan mingguan/bulanan skala personal.
 
 ---
 
@@ -64,32 +52,49 @@ lib/
 
 | Skenario | Langkah | Hasil yang diharapkan |
 |---|---|---|
-| Tambah transaksi expense | Isi nominal, pilih kategori Food, simpan | Muncul di list, warna merah, cek Firestore koleksi `transactions` ada dokumen baru dengan `userId` yang benar |
-| Tambah transaksi income | Ganti ke tab Pemasukan, pilih kategori Salary | Muncul di list dengan warna hijau dan tanda `+` |
-| Validasi nominal | Coba simpan tanpa isi nominal / isi 0 | Muncul pesan error, tidak tersimpan |
-| Edit transaksi | Tap transaksi di list, ubah nominal, simpan | Data di Firestore ter-update, ada field `updatedAt` |
-| Hapus transaksi | Swipe kiri, konfirmasi hapus | Transaksi hilang dari list, muncul snackbar dengan tombol Undo |
-| Undo hapus | Tap "Undo" di snackbar sebelum hilang | Transaksi muncul lagi persis dengan data yang sama |
-| Filter bulan | Tap panah kiri/kanan di filter bulan | List hanya menampilkan transaksi bulan yang dipilih |
-| Filter tipe | Pilih "Income" di dropdown | List hanya menampilkan transaksi income |
-
-Kalau query bulan belum jalan dan muncul error terkait index di console/log, itu tandanya composite index Firestore (`userId` + `date`) belum dibuat — klik link yang muncul di error tersebut untuk membuatnya otomatis (sudah disinggung di Tahap 3).
+| Toggle periode | Buka Report, pilih Mingguan lalu Bulanan | Angka & grafik berubah sesuai periode |
+| Ringkasan | Bandingkan Pemasukan/Pengeluaran dengan data manual di Transaction List | Angka cocok untuk periode yang sama |
+| Grafik tren mingguan | Tambah expense di hari yang berbeda-beda | Batang bertambah tinggi di hari yang sesuai (Sen–Min) |
+| Grafik tren bulanan | Tambah expense di tanggal awal & akhir bulan | Muncul di bucket minggu yang berbeda (M1 vs M4/M5) |
+| Kategori terbesar | Tambah beberapa expense di kategori berbeda | Kartu highlight menunjukkan kategori dengan total tertinggi |
+| Drill-down | Tap salah satu kategori di Rincian per Kategori | Masuk ke Transaction List dengan chip filter kategori aktif |
+| Hapus filter kategori | Di Transaction List hasil drill-down, tap (x) di chip | Filter kategori hilang, list kembali menampilkan semua |
+| Empty state | Buka Report untuk periode yang belum ada transaksi expense | Grafik & breakdown menampilkan pesan "Belum ada pengeluaran di periode ini" |
+| Akses dari Dashboard | Tap ikon grafik di AppBar Dashboard | Masuk ke halaman Report |
 
 ---
 
 ## 5. Kriteria Keberhasilan Fase Ini
 
-- ✅ CRUD transaksi berjalan penuh dan tersambung real-time ke Firestore.
-- ✅ Validasi nominal & kategori bekerja di level domain, bukan cuma UI.
-- ✅ Undo setelah hapus berfungsi.
-- ✅ `monthSummaryProvider` siap dipakai ulang untuk Dashboard.
+- ✅ Toggle mingguan/bulanan menampilkan data yang benar sesuai periode.
+- ✅ Grafik tren tetap ringkas (maks 7 atau 5 batang), tidak padat data.
+- ✅ Drill-down dari kategori ke Transaction List berfungsi.
+- ✅ Tidak ada query/koleksi Firestore baru — full reuse dari fitur transaction.
 
 ---
 
-## 6. Langkah Selanjutnya
+## 6. Ringkasan: Semua Fitur Inti FinTrack Selesai
 
-Fase berikutnya sesuai roadmap:
+Dengan Report ini, seluruh fitur inti dari brief awal kamu sudah terbangun:
 
-**Fase Dashboard Analytics** — `BalanceCard`, ringkasan income/expense (pakai `monthSummaryProvider` yang sudah ada), grafik donut pengeluaran per kategori, dan daftar transaksi terakhir — sesuai desain Tahap 4.
+| Fitur | Status |
+|---|---|
+| Authentication (Register/Login/Logout/Forgot Password) | ✅ |
+| Dashboard Analytics | ✅ |
+| Transaction CRUD | ✅ |
+| Category Management (default) | ✅ (bagian dari Transaction) |
+| Budget Management | ✅ |
+| Financial Report | ✅ |
+| Profile | ⏳ belum dibangun |
 
-Coba dulu testing di atas, kabari hasilnya, lalu kita lanjut ke Dashboard.
+---
+
+## 7. Langkah Selanjutnya
+
+Sesuai roadmap awal, yang tersisa:
+
+1. **Profile** — halaman sederhana (foto, nama, email, tombol logout, pengaturan dasar) + tab Profile di `AppShell`.
+2. **Testing** — unit test untuk use case murni yang sudah dibuat (`CalculateDashboardSummaryUseCase`, `CalculateBudgetProgressUseCase`, `CalculateReportSummaryUseCase` — semuanya sengaja dibuat tanpa dependency Firebase supaya gampang di-test).
+3. **Deployment** — build release, screenshot, README lengkap untuk portofolio.
+
+Coba dulu testing di atas, kabari hasilnya, lalu kita lanjut ke **Profile** — bagian terakhir yang belum ada UI-nya.
