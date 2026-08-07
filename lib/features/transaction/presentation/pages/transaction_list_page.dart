@@ -7,7 +7,8 @@ import '../widgets/transaction_list_tile.dart';
 import 'add_transaction_page.dart';
 
 class TransactionListPage extends ConsumerStatefulWidget {
-  const TransactionListPage({super.key});
+  final String? initialCategory;
+  const TransactionListPage({super.key, this.initialCategory});
 
   @override
   ConsumerState<TransactionListPage> createState() =>
@@ -16,6 +17,14 @@ class TransactionListPage extends ConsumerStatefulWidget {
 
 class _TransactionListPageState extends ConsumerState<TransactionListPage> {
   TransactionType? _typeFilter; // null = semua
+  String?
+      _categoryFilter; // null = semua kategori — diisi kalau datang dari drill-down Report
+
+  @override
+  void initState() {
+    super.initState();
+    _categoryFilter = widget.initialCategory;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,12 +48,27 @@ class _TransactionListPageState extends ConsumerState<TransactionListPage> {
                 ref.read(selectedMonthProvider.notifier).setMonth(m),
             onTypeChanged: (t) => setState(() => _typeFilter = t),
           ),
+          if (_categoryFilter != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Chip(
+                  label: Text('Kategori: $_categoryFilter'),
+                  onDeleted: () => setState(() => _categoryFilter = null),
+                ),
+              ),
+            ),
           Expanded(
             child: transactionsAsync.when(
               data: (transactions) {
-                final filtered = _typeFilter == null
-                    ? transactions
-                    : transactions.where((t) => t.type == _typeFilter).toList();
+                final filtered = transactions.where((t) {
+                  if (_typeFilter != null && t.type != _typeFilter)
+                    return false;
+                  if (_categoryFilter != null && t.category != _categoryFilter)
+                    return false;
+                  return true;
+                }).toList();
 
                 if (filtered.isEmpty) {
                   return const Center(
