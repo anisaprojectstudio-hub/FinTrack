@@ -1,100 +1,126 @@
-# FinTrack — Fase Financial Report
+# FinTrack — Fase Profile (Tanpa Firebase Storage)
 
-> Lanjutan dari fase Budget System. Halaman Report memberi gambaran pola keuangan mingguan/bulanan — mengikuti Tahap 1 (laporan mingguan/bulanan, kategori terbesar) dan desain Tahap 4.
+> Lanjutan dari fase Financial Report — fitur terakhir dari daftar Core Features di Tahap 1. **Catatan penting**: Firebase Storage sekarang wajib paket berbayar (Blaze), jadi foto profil di sini TIDAK memakainya sama sekali. Sebagai gantinya, foto dikompres kecil lalu disimpan sebagai **base64 langsung di Firestore**, yang tetap gratis di Spark plan.
 
 ---
 
-## 1. File yang Dibuat
+## 1. Kenapa Base64-di-Firestore, Bukan Firebase Storage
+
+| Firebase Storage | Base64-di-Firestore (dipakai di sini) |
+|---|---|
+| Wajib paket Blaze (kartu kredit, bayar-sesuai-pakai) | Gratis di Spark plan (kuota Firestore biasa) |
+| Perlu setup Storage Rules terpisah | Cukup Firestore Rules yang sudah ada (Tahap 3) |
+| Cocok untuk file besar (video, dokumen) | Cocok untuk foto kecil (avatar ~150–300px) |
+| URL publik oleh default (perlu rules ketat) | Data ikut aturan akses dokumen `users/{uid}` yang sudah aman |
+
+Trade-off yang perlu kamu tahu: foto ikut ke-fetch setiap kali dokumen user dibaca (field `photoUrl` sedikit "berat" dibanding string biasa), dan ukurannya dibatasi ketat (maks ~700KB base64, otomatis dikompres ke 300px). Untuk foto profil kecil, ini sama sekali tidak masalah — dan untuk skala portofolio/personal, jauh lebih praktis daripada harus aktifkan billing.
+
+---
+
+## 2. File yang Dibuat/Diperbarui
 
 ```
-lib/features/report/
-├── domain/
-│   ├── entities/
-│   │   ├── report_period.dart          # enum weekly/monthly
-│   │   └── report_summary.dart         # ReportSummary, CategoryBreakdownItem, TrendPoint
-│   └── usecases/calculate_report_summary_usecase.dart   # fungsi murni
-└── presentation/
-    ├── providers/report_providers.dart
-    ├── widgets/
-    │   ├── period_toggle.dart
-    │   ├── report_summary_row.dart
-    │   ├── report_trend_chart.dart          # pakai fl_chart BarChart
-    │   ├── top_category_highlight.dart
-    │   └── category_breakdown_list.dart     # tappable, drill-down
-    └── pages/report_page.dart
+lib/
+├── core/utils/image_encoder.dart          # BARU — kompres foto ke base64
+│
+└── features/profile/
+    ├── domain/
+    │   ├── repositories/profile_repository.dart          # diperbarui — signature uploadPhoto
+    │   └── usecases/
+    │       ├── watch_profile_usecase.dart
+    │       ├── update_name_usecase.dart
+    │       ├── upload_profile_photo_usecase.dart          # diperbarui — Result<void>
+    │       └── update_notification_setting_usecase.dart
+    ├── data/
+    │   ├── datasources/profile_remote_data_source.dart    # diperbarui — HAPUS Firebase Storage
+    │   └── repositories/profile_repository_impl.dart      # diperbarui
+    └── presentation/
+        ├── providers/profile_providers.dart                # diperbarui — hapus DI FirebaseStorage
+        ├── widgets/
+        │   ├── profile_avatar.dart                          # BARU — render base64 / inisial nama
+        │   ├── profile_header.dart                          # diperbarui — pakai ProfileAvatar
+        │   └── settings_menu_tile.dart
+        └── pages/
+            ├── profile_page.dart
+            ├── edit_profile_page.dart
+            └── change_password_page.dart
 ```
 
-Dua file yang sudah ada juga **diperbarui**:
-- `transaction_list_page.dart` — sekarang menerima `initialCategory` opsional + chip filter kategori yang bisa dihapus, mendukung drill-down dari Report.
-- `dashboard_page.dart` — ada ikon grafik di AppBar yang membuka Report (sesuai keputusan navigasi Tahap 4: Report diakses dari Dashboard, bukan dari bottom nav).
+Juga diperbarui sebelumnya: `user_entity.dart` (+`notificationsEnabled`), `user_model.dart` (parsing dari `settings.notificationsEnabled`), dan `app_shell.dart` (tab Profile, bottom nav lengkap 4 tab).
 
 ---
 
-## 2. Cara Pasang
+## 3. Cara Pasang
 
-1. Salin folder `lib/features/report/` ke project kamu.
-2. Timpa `transaction_list_page.dart` dan `dashboard_page.dart` dengan versi terbaru.
-3. `flutter pub get` (tidak ada dependency baru — `fl_chart` sudah ada), lalu `flutter run`.
-
----
-
-## 3. Poin Desain Penting
-
-- **Report tidak punya data layer sendiri** — persis pola Dashboard: `reportSummaryProvider` reuse `allTransactionsStreamProvider` yang sudah ada, lalu diproses lewat `CalculateReportSummaryUseCase` (fungsi murni, tidak sentuh Firebase).
-- **Grafik tren sengaja dibuat ringkas**: mingguan → 7 batang harian (Sen–Min), bulanan → maksimal 5 batang per minggu-ke (bukan 31 batang harian) — konsisten dengan prinsip UX Tahap 4 "satu insight jelas lebih baik dari grafik padat data".
-- **Minggu berjalan pakai konvensi Senin–Minggu**, dihitung dari tanggal hari ini — bukan tanggal yang sedang difilter di Transaction List/Budget (Report selalu tentang periode "sekarang", sesuai brief awal yang tidak menyebutkan navigasi mundur untuk laporan).
-- **Drill-down kategori** — tap kategori di breakdown list membuka Transaction List dengan filter kategori otomatis aktif (bisa dihapus lewat chip). Catatan kecil: kalau kamu drill-down dari laporan **mingguan** yang kebetulan menyentuh bulan berbeda dari bulan yang sedang aktif di Transaction List, hasil yang tampil tetap mengikuti bulan aktif itu — ini simplifikasi wajar untuk MVP, bisa disempurnakan nanti kalau perlu.
-- **Sama seperti Dashboard**, data dibatasi hingga 500 transaksi terbaru (limit dari `allTransactionsStreamProvider`) — lebih dari cukup untuk laporan mingguan/bulanan skala personal.
+1. Salin/timpa semua file di atas ke project kamu.
+2. **Update `pubspec.yaml`**:
+   - **Hapus** baris `firebase_storage: ^12.1.0` (tidak dipakai lagi).
+   - **Tambahkan**:
+     ```yaml
+     image: ^4.2.0
+     ```
+     (package murni Dart untuk resize/kompres gambar, tanpa setup native tambahan)
+3. `flutter pub get`, lalu `flutter run`.
+4. **Tidak perlu** mengaktifkan Firebase Storage di Firebase Console sama sekali untuk fitur ini — cukup Firestore yang sudah ada.
 
 ---
 
-## 4. Testing Manual
+## 4. Cara Kerja Singkat
+
+1. User tap foto di `ProfileHeader` → `image_picker` buka galeri.
+2. File dibaca jadi bytes → `ImageEncoder.compressToDataUri()`: resize ke maksimal 300px, encode JPEG dengan kualitas diturunkan bertahap (70→50→35→20) sampai ukurannya ≤700KB base64. Kalau tetap kebesaran, return `null` → muncul pesan "Foto terlalu besar".
+3. Hasilnya (`data:image/jpeg;base64,...`) langsung ditulis ke field `photoUrl` di dokumen `users/{uid}` — **tidak ada** panggilan ke Storage sama sekali.
+4. `ProfileAvatar` mendeteksi apakah `photoUrl` adalah data URI (`ImageEncoder.decodeDataUri`) lalu render lewat `Image.memory`. Kalau belum ada foto, otomatis tampil inisial nama sebagai fallback.
+5. **Profile pakai stream real-time sendiri** (`profileStreamProvider`, beda dari `authStateProvider` yang cuma "bangun" saat sign-in/sign-out) — jadi perubahan nama/foto langsung tercermin di UI tanpa perlu logout-login.
+6. **Ubah password TIDAK pakai `updatePassword()` langsung** (Firebase Auth menolaknya kalau sesi sudah agak lama — "requires-recent-login"). `ChangePasswordPage` reuse `ForgotPasswordUseCase` dari fase Authentication — kirim link reset ke email sendiri.
+
+---
+
+## 5. Testing Manual
 
 | Skenario | Langkah | Hasil yang diharapkan |
 |---|---|---|
-| Toggle periode | Buka Report, pilih Mingguan lalu Bulanan | Angka & grafik berubah sesuai periode |
-| Ringkasan | Bandingkan Pemasukan/Pengeluaran dengan data manual di Transaction List | Angka cocok untuk periode yang sama |
-| Grafik tren mingguan | Tambah expense di hari yang berbeda-beda | Batang bertambah tinggi di hari yang sesuai (Sen–Min) |
-| Grafik tren bulanan | Tambah expense di tanggal awal & akhir bulan | Muncul di bucket minggu yang berbeda (M1 vs M4/M5) |
-| Kategori terbesar | Tambah beberapa expense di kategori berbeda | Kartu highlight menunjukkan kategori dengan total tertinggi |
-| Drill-down | Tap salah satu kategori di Rincian per Kategori | Masuk ke Transaction List dengan chip filter kategori aktif |
-| Hapus filter kategori | Di Transaction List hasil drill-down, tap (x) di chip | Filter kategori hilang, list kembali menampilkan semua |
-| Empty state | Buka Report untuk periode yang belum ada transaksi expense | Grafik & breakdown menampilkan pesan "Belum ada pengeluaran di periode ini" |
-| Akses dari Dashboard | Tap ikon grafik di AppBar Dashboard | Masuk ke halaman Report |
+| Belum ada foto | Buka Profil untuk akun baru | Avatar menampilkan inisial nama/email, bukan foto kosong/rusak |
+| Upload foto | Tap avatar, pilih foto dari galeri | Foto muncul di avatar setelah beberapa detik; cek field `photoUrl` di Firebase Console diawali `data:image/jpeg;base64,` |
+| Ganti foto | Upload foto lain | Foto lama tergantikan, nama & pengaturan notifikasi tidak ikut berubah |
+| Foto besar | Upload foto resolusi tinggi (misal 4000×3000) | Tetap berhasil — otomatis terkompres ke ≤700KB tanpa campur tangan user |
+| Edit nama | Tap "Edit Profil", ubah nama, simpan | Nama baru langsung tampil real-time di header |
+| Toggle notifikasi | Tap switch "Notifikasi" | Berubah tanpa reload; `users/{uid}.settings.notificationsEnabled` ikut berubah di Firestore |
+| Ubah password | Tap "Ubah Password" → "Kirim Link" | Muncul konfirmasi terkirim, cek inbox email |
+| Logout | Tap "Logout", konfirmasi | Kembali ke halaman Login otomatis lewat `_AuthGate` |
+| Tidak ada biaya | Cek Firebase Console → Storage | Tidak ada bucket/file baru yang terbuat sama sekali |
 
 ---
 
-## 5. Kriteria Keberhasilan Fase Ini
+## 6. Kriteria Keberhasilan Fase Ini
 
-- ✅ Toggle mingguan/bulanan menampilkan data yang benar sesuai periode.
-- ✅ Grafik tren tetap ringkas (maks 7 atau 5 batang), tidak padat data.
-- ✅ Drill-down dari kategori ke Transaction List berfungsi.
-- ✅ Tidak ada query/koleksi Firestore baru — full reuse dari fitur transaction.
+- ✅ Fitur foto profil berfungsi penuh tanpa Firebase Storage / tanpa paket Blaze.
+- ✅ Fallback inisial nama membuat avatar tetap terlihat profesional walau belum upload foto.
+- ✅ Kompresi otomatis mencegah dokumen Firestore membengkak melebihi batas 1 MB.
+- ✅ Ubah nama, ubah password, toggle notifikasi, dan logout tetap berfungsi seperti sebelumnya.
+- ✅ Semua 4 tab di `AppShell` punya fitur nyata — tidak ada lagi placeholder.
 
 ---
 
-## 6. Ringkasan: Semua Fitur Inti FinTrack Selesai
-
-Dengan Report ini, seluruh fitur inti dari brief awal kamu sudah terbangun:
+## 7. Semua Fitur Inti FinTrack — Selesai
 
 | Fitur | Status |
 |---|---|
-| Authentication (Register/Login/Logout/Forgot Password) | ✅ |
+| Authentication | ✅ |
 | Dashboard Analytics | ✅ |
 | Transaction CRUD | ✅ |
-| Category Management (default) | ✅ (bagian dari Transaction) |
+| Category Management | ✅ |
 | Budget Management | ✅ |
 | Financial Report | ✅ |
-| Profile | ⏳ belum dibangun |
+| Profile (foto tanpa biaya) | ✅ |
 
 ---
 
-## 7. Langkah Selanjutnya
+## 8. Langkah Selanjutnya
 
-Sesuai roadmap awal, yang tersisa:
+Sisa dari roadmap awal:
 
-1. **Profile** — halaman sederhana (foto, nama, email, tombol logout, pengaturan dasar) + tab Profile di `AppShell`.
-2. **Testing** — unit test untuk use case murni yang sudah dibuat (`CalculateDashboardSummaryUseCase`, `CalculateBudgetProgressUseCase`, `CalculateReportSummaryUseCase` — semuanya sengaja dibuat tanpa dependency Firebase supaya gampang di-test).
-3. **Deployment** — build release, screenshot, README lengkap untuk portofolio.
+1. **Testing** — unit test untuk use case murni (`CalculateDashboardSummaryUseCase`, `CalculateBudgetProgressUseCase`, `CalculateReportSummaryUseCase`, `ImageEncoder`, dan validasi di use case Auth/Transaction/Budget) — semuanya sengaja dipisah dari Firebase sejak awal supaya bagian ini tinggal dikerjakan tanpa mock rumit.
+2. **Deployment** — build APK release, ambil screenshot tiap halaman, lengkapi README GitHub untuk portofolio (target kualitas yang kamu minta di Tahap 1).
 
-Coba dulu testing di atas, kabari hasilnya, lalu kita lanjut ke **Profile** — bagian terakhir yang belum ada UI-nya.
+Coba dulu testing manual di atas untuk seluruh alur app dari awal (register sampai logout, termasuk upload foto). Kalau semua lancar, kabari saya — kita lanjut ke fase **Testing**.

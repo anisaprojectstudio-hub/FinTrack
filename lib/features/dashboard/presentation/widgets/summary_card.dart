@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
-/// Kartu kecil berdampingan untuk income & expense bulan berjalan
-/// (sesuai Tahap 4) — dipakai dua kali dengan warna/ikon berbeda.
+/// Kartu kecil berdampingan untuk income & expense bulan berjalan.
 class SummaryCard extends StatelessWidget {
   final String label;
   final double amount;
@@ -30,18 +29,38 @@ class SummaryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 18),
+              Icon(
+                icon,
+                color: color,
+                size: 18,
+              ),
               const SizedBox(width: 6),
-              Text(label, style: Theme.of(context).textTheme.bodySmall),
+
+              // Agar label tidak menyebabkan overflow
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            CurrencyFormatter.format(amount),
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600, color: color),
+
+          // Agar nominal tetap muat di layar kecil
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              CurrencyFormatter.format(amount),
+              maxLines: 1,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+            ),
           ),
         ],
       ),
