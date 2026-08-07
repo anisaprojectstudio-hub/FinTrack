@@ -19,24 +19,30 @@ class ImageEncoder {
   /// menurunkan kualitas JPEG bertahap sampai muat di batas aman.
   /// Return null kalau gambar gagal didekode atau tetap kebesaran.
   static String? compressToDataUri(Uint8List bytes) {
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) return null;
+    try {
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) return null;
 
-    final isLandscape = decoded.width >= decoded.height;
-    final resized = img.copyResize(
-      decoded,
-      width: isLandscape ? 300 : null,
-      height: isLandscape ? null : 300,
-    );
+      final isLandscape = decoded.width >= decoded.height;
+      final resized = img.copyResize(
+        decoded,
+        width: isLandscape ? 300 : null,
+        height: isLandscape ? null : 300,
+      );
 
-    for (final quality in [70, 50, 35, 20]) {
-      final jpg = img.encodeJpg(resized, quality: quality);
-      final base64Str = base64Encode(jpg);
-      if (base64Str.length <= _maxBase64Chars) {
-        return 'data:image/jpeg;base64,$base64Str';
+      for (final quality in [70, 50, 35, 20]) {
+        final jpg = img.encodeJpg(resized, quality: quality);
+        final base64Str = base64Encode(jpg);
+
+        if (base64Str.length <= _maxBase64Chars) {
+          return 'data:image/jpeg;base64,$base64Str';
+        }
       }
+
+      return null;
+    } catch (_) {
+      return null;
     }
-    return null; // tetap kebesaran walau sudah dikompres maksimal
   }
 
   /// Kebalikan dari [compressToDataUri] — dipakai widget untuk menampilkan
