@@ -4,11 +4,13 @@ class UserEntity {
   final String name;
   final String email;
   final String? photoUrl;
+  final bool notificationsEnabled;
 
   const UserEntity({
     required this.uid,
     required this.name,
     required this.email,
     this.photoUrl,
+    this.notificationsEnabled = true,
   });
 }
