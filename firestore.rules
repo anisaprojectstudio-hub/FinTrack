@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users hanya bisa baca/tulis dokumen profilnya sendiri
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Transaksi hanya bisa diakses oleh pemiliknya
+    match /transactions/{transactionId} {
+      allow read, update, delete: if request.auth != null
+                                   && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.amount is number
+                    && request.resource.data.type in ['income', 'expense'];
+    }
+
+    // Budget hanya bisa diakses oleh pemiliknya
+    match /budgets/{budgetId} {
+      allow read, update, delete: if request.auth != null
+                                   && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.limitAmount is number;
+    }
+  }
+}
