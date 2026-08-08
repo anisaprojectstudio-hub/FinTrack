@@ -1,1 +1,6 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"fintrack-finance","appId":"1:377134130294:android:fe20c46747dd2b2ede2b57","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"fintrack-finance","configurations":{"android":"1:377134130294:android:fe20c46747dd2b2ede2b57","web":"1:377134130294:web:4601ca0e8d9e8aa3de2b57","windows":"1:377134130294:web:4601ca0e8d9e8aa3de2b57"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
